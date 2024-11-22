@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <div class="search-bar">
+            <input id="Search" type="text" placeholder="Search City">
+            <button onclick="searchCityWeather()">🔍</button>
+        </div>
+
+        <header class="header">
+            <h1 id="city-name">Ulaanbaatar</h1>
+            <div class="toggle-units">
+                <button onclick="updateTemperatureUnit('F')">°F</button>
+                <button class="active" onclick="updateTemperatureUnit('C')">°C</button>
+            </div>
+        </header>
+
+        <section class="current-weather">
+            <div class="temperature">
+                <span id="main-temp" class="temp">--</span>° 🌧️
+            </div>
+            <div class="current-details">
+                <p>Real Feel: <span id="feels">--</span>°</p>
+                <p>Wind: <span id="wind">--</span> km/h</p>
+                <p>Pressure: <span id="pressure">--</span> MB</p>
+                <p>Humidity: <span id="humidity">--</span>%</p>
+            </div>
+            <div class="sun-details">
+                <p>Sunrise: <span id="sunrise">--</span></p>
+                <p>Sunset: <span id="sunset">--</span></p>
+            </div>
+        </section>
+
+        <section class="forecast">
+            <h2>5-Day Weather Forecast</h2>
+            <div id="forecast-container">
+            </div>
+        </section>
+
+        <section class="coordinate-search">
+            <h3>Find Location by Coordinates</h3>
+            <input type="text" id="latitude" placeholder="Enter Latitude">
+            <input type="text" id="longitude" placeholder="Enter Longitude">
+            <button onclick="findLocation()">Search Location</button>
+            <p id="location-result"></p>
+        </section>
+    </div>
+
+    <script>
+      const apiKey = "580e9a4b6699a97ac820594d6eab336a"; 
+      let currentUnit = 'C'; 
+
+      
+      function kelvinToCelsius(kelvin) {
+          return (kelvin - 273.15).toFixed(1);
+      }
+
+    
+      function celsiusToFahrenheit(celsius) {
+          return ((celsius * 9/5) + 32).toFixed(1);
+      }
+
+      
+      async function getWeatherData(city = "Ulaanbaatar") {
+          const apiURL = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}`;
+          const response = await fetch(apiURL);
+
+          if (!response.ok) {
+              alert("City not found!");
+              throw new Error("City not found");
+          }
+          return response.json();
+      }
+
+    
+      async function getFiveDayForecast(city = "Ulaanbaatar") {
+          const apiURL = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${apiKey}`;
+          const response = await fetch(apiURL);
+
+          if (!response.ok) {
+              alert("Failed to fetch forecast data!");
+              throw new Error("Failed to fetch forecast data");
+          }
+          return response.json();
+      }
+
+    
+      function updateUI(data) {
+          const tempCelsius = kelvinToCelsius(data.main.temp);
+          const feelsCelsius = kelvinToCelsius(data.main.feels_like);
+          const windSpeed = data.wind.speed.toFixed(1);
+          const pressure = data.main.pressure;
+          const humidity = data.main.humidity;
+
+          const sunrise = new Date(data.sys.sunrise * 1000).toLocaleTimeString();
+          const sunset = new Date(data.sys.sunset * 1000).toLocaleTimeString();
+
+          document.getElementById("main-temp").innerText = currentUnit === 'C' ? tempCelsius : celsiusToFahrenheit(tempCelsius);
+          document.getElementById("feels").innerText = currentUnit === 'C' ? feelsCelsius : celsiusToFahrenheit(feelsCelsius);
+          document.getElementById("wind").innerText = windSpeed;
+          document.getElementById("pressure").innerText = pressure;
+          document.getElementById("humidity").innerText = humidity;
+
+          document.getElementById("sunrise").innerText = sunrise;
+          document.getElementById("sunset").innerText = sunset;
+      }
+
+      
+      function updateForecastUI(data) {
+          const forecastContainer = document.getElementById("forecast-container");
+          forecastContainer.innerHTML = ""; 
+
+          const dailyData = data.list.filter(item => item.dt_txt.includes("12:00:00"));
+
+          dailyData.forEach(day => {
+              const date = new Date(day.dt * 1000).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+              const tempCelsius = kelvinToCelsius(day.main.temp);
+              const condition = day.weather[0].description;
+              const icon = `https://openweathermap.org/img/wn/${day.weather[0].icon}@2x.png`;
+
+              const forecastCard = `
+                  <div class="day">
+                      <h3>${date}</h3>
+                      <img src="${icon}" alt="${condition}" />
+                      <p>${currentUnit === 'C' ? tempCelsius : celsiusToFahrenheit(tempCelsius)}°${currentUnit}</p>
+                      <p>${condition}</p>
+                  </div>
+              `;
+
+              forecastContainer.innerHTML += forecastCard;
+          });
+      }
+
+      
+      function updateTemperatureUnit(unit) {
+          currentUnit = unit;
+          const unitButtons = document.querySelectorAll('.toggle-units button');
+          unitButtons.forEach(button => {
+              button.classList.remove('active');
+          });
+
+          if (unit === 'F') {
+              document.querySelectorAll('.toggle-units button')[0].classList.add('active');
+          } else {
+              document.querySelectorAll('.toggle-units button')[1].classList.add('active');
+          }
+
+          searchCityWeather(); 
+      }
+
+      
+      async function searchCityWeather() {
+          const city = document.getElementById("Search").value || "Ulaanbaatar";
+          try {
+              const currentWeather = await getWeatherData(city);
+              updateUI(currentWeather);
+
+              const forecastData = await getFiveDayForecast(city);
+              updateForecastUI(forecastData);
+
+              document.getElementById("city-name").innerText = city;
+          } catch (error) {
+              console.error(error.message);
+          }
+      }
+
+      
+      searchCityWeather();
+      const currentWeatherSection = document.querySelector('.current-weather');
+
+      
+      for (let i = 0; i < 10; i++) {
+        const raindrop = document.createElement('div');
+         raindrop.classList.add('raindrop');
+        currentWeatherSection.appendChild(raindrop);
+}
+
+
+      async function searchCityWeather() {
+        const city = document.getElementById("Search").value || "Улаанбаатар";
+        try {
+             const currentWeather = await getWeatherData(city);
+            updateUI(currentWeather);
+
+            const forecastData = await getFiveDayForecast(city);
+            updateForecastUI(forecastData);
+
+            document.getElementById("city-name").innerText = city;
+    } catch (error) {
+        console.error(error.message);
+    }
+}
+
+const rainContainer = document.querySelector('.rain-container');
+    for (let i = 0; i < 50; i++) {
+      const rainDrop = document.createElement('div');
+      rainDrop.classList.add('rain-drop');
+      rainContainer.appendChild(rainDrop);
+    }
+
+
+
+      
+
+
+  </script>
+
+</body>
+</html>
